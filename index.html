@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="es-PY">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guarida — Gestión de mascotas</title>
+<meta name="theme-color" content="#C1694F">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<header class="app-header">
+  <div>
+    <h1>Guarida</h1>
+    <div class="subtitulo">Gestión de mascotas</div>
+  </div>
+  <div style="display:flex; gap:.4rem;">
+    <button class="btn-header" onclick="abrirImportar()">Importar</button>
+    <button class="btn-header" onclick="descargarBackup(true)">Backup</button>
+  </div>
+  <input type="file" id="input-importar" accept=".xlsx" style="display:none" onchange="onImportarArchivo(event)">
+</header>
+
+<main>
+
+  <!-- DASHBOARD -->
+  <section id="tab-dashboard" class="tab-panel activo">
+    <div class="card">
+      <div class="seccion-titulo"><h3>Pendientes</h3></div>
+      <div id="dashboard-alertas"></div>
+    </div>
+    <div class="card">
+      <div class="seccion-titulo"><h3>Gasto de este mes</h3></div>
+      <div class="stat-grande" id="dashboard-gasto-mes">₲ 0</div>
+    </div>
+    <div class="card">
+      <div class="seccion-titulo"><h3>Mascotas activas</h3></div>
+      <div id="dashboard-resumen"></div>
+    </div>
+  </section>
+
+  <!-- MASCOTAS -->
+  <section id="tab-mascotas" class="tab-panel">
+    <div class="seccion-titulo">
+      <h3>Mascotas</h3>
+    </div>
+    <div id="lista-mascotas"></div>
+
+    <details id="archivadas-detalle">
+      <summary>Mascotas archivadas</summary>
+      <div id="lista-mascotas-archivadas"></div>
+    </details>
+
+    <button class="fab" onclick="abrirModalMascota()">＋</button>
+  </section>
+
+  <!-- COMIDA -->
+  <section id="tab-comida" class="tab-panel">
+    <div class="card">
+      <div class="seccion-titulo"><h3>Stock general</h3></div>
+      <div id="stock-comida-resumen"></div>
+    </div>
+
+    <div class="seccion">
+      <h3>Registrar compra</h3>
+      <form id="form-compra-comida" onsubmit="guardarCompraComida(event)">
+        <div>
+          <label>Marca / tipo de alimento</label>
+          <input type="text" id="cc-marca" required placeholder="Ej: Pro Plan Adulto">
+        </div>
+        <div class="fila-2">
+          <div>
+            <label>Cantidad (kg)</label>
+            <input type="number" step="0.1" id="cc-kg" required>
+          </div>
+          <div>
+            <label>Costo (₲)</label>
+            <input type="number" step="1" id="cc-costo" required>
+          </div>
+        </div>
+        <div>
+          <label>Fecha</label>
+          <input type="date" id="cc-fecha" class="hoy-default">
+        </div>
+        <button class="btn-primario" type="submit">Guardar compra</button>
+      </form>
+    </div>
+
+    <div class="seccion">
+      <h3>Historial de compras</h3>
+      <div id="lista-compras-comida"></div>
+    </div>
+  </section>
+
+  <!-- SALUD -->
+  <section id="tab-salud" class="tab-panel">
+
+    <div class="seccion">
+      <h3>Vacunas</h3>
+      <form id="form-vacuna" onsubmit="guardarVacuna(event)">
+        <div>
+          <label>Mascota</label>
+          <select id="sel-vacuna-mascota" required></select>
+        </div>
+        <div>
+          <label>Vacuna</label>
+          <input type="text" id="v-nombre" required placeholder="Ej: Antirrábica">
+        </div>
+        <div class="fila-2">
+          <div>
+            <label>Fecha aplicada</label>
+            <input type="date" id="v-fecha" class="hoy-default">
+          </div>
+          <div>
+            <label>Próxima dosis (opcional)</label>
+            <input type="date" id="v-proxima">
+          </div>
+        </div>
+        <button class="btn-primario" type="submit">Guardar vacuna</button>
+      </form>
+      <div id="lista-vacunas" style="margin-top:.8rem;"></div>
+    </div>
+
+    <div class="seccion">
+      <h3>Desparasitación / antipulgas</h3>
+      <form id="form-tratamiento" onsubmit="guardarTratamiento(event)">
+        <div>
+          <label>Mascota</label>
+          <select id="sel-tratamiento-mascota" required></select>
+        </div>
+        <div class="fila-2">
+          <div>
+            <label>Tipo</label>
+            <select id="t-tipo">
+              <option value="Desparasitación interna">Desparasitación interna</option>
+              <option value="Antipulgas/garrapatas">Antipulgas/garrapatas</option>
+            </select>
+          </div>
+          <div>
+            <label>Producto</label>
+            <input type="text" id="t-producto" placeholder="Opcional">
+          </div>
+        </div>
+        <div class="fila-2">
+          <div>
+            <label>Fecha aplicado</label>
+            <input type="date" id="t-fecha" class="hoy-default">
+          </div>
+          <div>
+            <label>Próxima aplicación</label>
+            <input type="date" id="t-proxima">
+          </div>
+        </div>
+        <button class="btn-primario" type="submit">Guardar tratamiento</button>
+      </form>
+      <div id="lista-tratamientos" style="margin-top:.8rem;"></div>
+    </div>
+
+    <div class="seccion">
+      <h3>Medicamentos</h3>
+      <form id="form-medicamento" onsubmit="guardarMedicamento(event)">
+        <div>
+          <label>Mascota</label>
+          <select id="sel-medicamento-mascota" required></select>
+        </div>
+        <div class="fila-2">
+          <div>
+            <label>Nombre</label>
+            <input type="text" id="med-nombre" required>
+          </div>
+          <div>
+            <label>Dosis</label>
+            <input type="text" id="med-dosis" placeholder="Ej: 1/2 comp. cada 12h">
+          </div>
+        </div>
+        <div class="fila-2">
+          <div>
+            <label>Inicio</label>
+            <input type="date" id="med-inicio" class="hoy-default">
+          </div>
+          <div>
+            <label>Fin (si aplica)</label>
+            <input type="date" id="med-fin">
+          </div>
+        </div>
+        <div>
+          <label>Notas</label>
+          <textarea id="med-notas"></textarea>
+        </div>
+        <button class="btn-primario" type="submit">Guardar medicamento</button>
+      </form>
+      <div id="lista-medicamentos" style="margin-top:.8rem;"></div>
+    </div>
+
+    <div class="seccion">
+      <h3>Visitas al veterinario</h3>
+      <form id="form-visita" onsubmit="guardarVisita(event)">
+        <div>
+          <label>Mascota</label>
+          <select id="sel-visita-mascota" required></select>
+        </div>
+        <div class="fila-2">
+          <div>
+            <label>Fecha</label>
+            <input type="date" id="vv-fecha" class="hoy-default">
+          </div>
+          <div>
+            <label>Costo (₲)</label>
+            <input type="number" step="1" id="vv-costo">
+          </div>
+        </div>
+        <div>
+          <label>Motivo</label>
+          <input type="text" id="vv-motivo" required placeholder="Ej: Control anual">
+        </div>
+        <div>
+          <label>Diagnóstico / notas</label>
+          <textarea id="vv-diagnostico"></textarea>
+        </div>
+        <div>
+          <label>Veterinario/a</label>
+          <input type="text" id="vv-veterinario">
+        </div>
+        <button class="btn-primario" type="submit">Guardar visita</button>
+      </form>
+      <div id="lista-visitas" style="margin-top:.8rem;"></div>
+    </div>
+  </section>
+
+  <!-- GASTOS -->
+  <section id="tab-gastos" class="tab-panel">
+    <div class="seccion">
+      <h3>Resumen por categoría</h3>
+      <div id="resumen-gastos-categorias"></div>
+    </div>
+
+    <div class="seccion">
+      <h3>Registrar gasto adicional</h3>
+      <p class="nota-disclaimer">Comida y visitas veterinarias se registran en sus propias pestañas; acá van accesorios, peluquería y otros.</p>
+      <form id="form-gasto-extra" onsubmit="guardarGastoExtra(event)">
+        <div class="fila-2">
+          <div>
+            <label>Categoría</label>
+            <select id="ge-categoria">
+              <option value="Accesorios/juguetes">Accesorios/juguetes</option>
+              <option value="Peluquería">Peluquería</option>
+              <option value="Otros">Otros</option>
+            </select>
+          </div>
+          <div>
+            <label>Monto (₲)</label>
+            <input type="number" step="1" id="ge-monto" required>
+          </div>
+        </div>
+        <div>
+          <label>Descripción</label>
+          <input type="text" id="ge-descripcion" required placeholder="Ej: Correa nueva">
+        </div>
+        <div class="fila-2">
+          <div>
+            <label>Fecha</label>
+            <input type="date" id="ge-fecha" class="hoy-default">
+          </div>
+          <div>
+            <label>Mascota</label>
+            <select id="sel-gasto-mascota"></select>
+          </div>
+        </div>
+        <button class="btn-primario" type="submit">Guardar gasto</button>
+      </form>
+    </div>
+
+    <div class="seccion">
+      <h3>Historial</h3>
+      <div id="lista-gastos-extra"></div>
+    </div>
+  </section>
+
+  <!-- BITÁCORA -->
+  <section id="tab-bitacora" class="tab-panel">
+    <div class="seccion">
+      <h3>Nueva anotación</h3>
+      <form id="form-evento" onsubmit="guardarEvento(event)">
+        <div class="fila-2">
+          <div>
+            <label>Fecha</label>
+            <input type="date" id="ev-fecha" class="hoy-default">
+          </div>
+          <div>
+            <label>Mascota</label>
+            <select id="sel-evento-mascota"></select>
+          </div>
+        </div>
+        <div>
+          <label>Nota</label>
+          <textarea id="ev-nota" required placeholder="Ej: Empezó a comer mejor, se adaptó al nuevo alimento..."></textarea>
+        </div>
+        <button class="btn-primario" type="submit">Guardar anotación</button>
+      </form>
+    </div>
+    <div class="seccion">
+      <h3>Historial</h3>
+      <div id="lista-eventos"></div>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabs">
+  <button class="tab-btn activo" data-tab="dashboard"><span class="icono">🏠</span>Inicio</button>
+  <button class="tab-btn" data-tab="mascotas"><span class="icono">🐾</span>Mascotas</button>
+  <button class="tab-btn" data-tab="comida"><span class="icono">🍖</span>Comida</button>
+  <button class="tab-btn" data-tab="salud"><span class="icono">💉</span>Salud</button>
+  <button class="tab-btn" data-tab="gastos"><span class="icono">💰</span>Gastos</button>
+  <button class="tab-btn" data-tab="bitacora"><span class="icono">📔</span>Notas</button>
+</nav>
+
+<!-- MODAL MASCOTA -->
+<div class="modal-fondo" id="modal-mascota">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-mascota-titulo">Agregar mascota</h3>
+      <button class="btn-icono" onclick="cerrarModalMascota()">✕</button>
+    </div>
+    <form id="form-mascota" onsubmit="guardarMascota(event)">
+      <input type="hidden" id="form-mascota-id">
+      <div>
+        <label>Foto</label>
+        <input type="file" accept="image/*" onchange="onFotoSeleccionada(event)">
+        <div id="preview-foto"></div>
+      </div>
+      <div class="fila-2">
+        <div>
+          <label>Nombre</label>
+          <input type="text" id="m-nombre" required>
+        </div>
+        <div>
+          <label>Especie</label>
+          <select id="m-especie">
+            <option value="perro">Perro</option>
+            <option value="gato">Gato</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+      </div>
+      <div class="fila-2">
+        <div>
+          <label>Raza (o "sin raza")</label>
+          <input type="text" id="m-raza" placeholder="Ej: Labrador, criollo...">
+        </div>
+        <div>
+          <label>Sexo</label>
+          <select id="m-sexo">
+            <option value="">—</option>
+            <option value="macho">Macho</option>
+            <option value="hembra">Hembra</option>
+          </select>
+        </div>
+      </div>
+      <div class="fila-2">
+        <div>
+          <label>Fecha de nacimiento</label>
+          <input type="date" id="m-nacimiento">
+        </div>
+        <div class="campo-check" style="align-self:flex-end; margin-bottom:.5rem;">
+          <input type="checkbox" id="m-nacimiento-estimado">
+          <label for="m-nacimiento-estimado" style="margin:0;">Es estimada</label>
+        </div>
+      </div>
+      <div>
+        <label>Fecha en que la recibiste</label>
+        <input type="date" id="m-llegada">
+      </div>
+      <div class="campo-check">
+        <input type="checkbox" id="m-esterilizado">
+        <label for="m-esterilizado" style="margin:0;">Esterilizado/a</label>
+      </div>
+      <div>
+        <label>N° de microchip (opcional)</label>
+        <input type="text" id="m-microchip">
+      </div>
+      <div>
+        <label>Descripción</label>
+        <textarea id="m-descripcion"></textarea>
+      </div>
+      <button class="btn-primario" type="submit">Guardar</button>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL PESO -->
+<div class="modal-fondo" id="modal-peso">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Registrar peso</h3>
+      <button class="btn-icono" onclick="cerrarModalPeso()">✕</button>
+    </div>
+    <form id="form-peso" onsubmit="guardarPeso(event)">
+      <input type="hidden" id="form-peso-id">
+      <div class="fila-2">
+        <div>
+          <label>Fecha</label>
+          <input type="date" id="p-fecha">
+        </div>
+        <div>
+          <label>Peso (kg)</label>
+          <input type="number" step="0.1" id="p-peso" required>
+        </div>
+      </div>
+      <button class="btn-primario" type="submit">Guardar peso</button>
+    </form>
+    <h4>Historial</h4>
+    <div id="historial-peso"></div>
+  </div>
+</div>
+
+<!-- MODAL RECOMENDACIONES -->
+<div class="modal-fondo" id="modal-recomendaciones">
+  <div class="modal">
+    <div class="modal-header">
+      <div></div>
+      <button class="btn-icono" onclick="cerrarModalRecomendaciones()">✕</button>
+    </div>
+    <div id="modal-recomendaciones-contenido"></div>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
